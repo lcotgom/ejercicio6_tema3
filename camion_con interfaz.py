@@ -149,24 +149,86 @@ class CamionesApp:
         self.root.title("Simulador de Camiones 🚚")
         self.audio = AudioManager()
 
-        self.canvas = tk.Canvas(root, width=CANVAS_W, height=CANVAS_H, bg="lightblue")
-        self.canvas.pack()
+        # canvas a la izquierda, panel de controles a la derecha
+        self.canvas = tk.Canvas(root, width=CANVAS_W, height=CANVAS_H, bg="lightblue", bd=2, relief='sunken')
+        self.canvas.pack(side='left', fill='both', expand=True)
+
+        # Bind click events on canvas for selection and claxon (right-click)
+        self.canvas.bind('<Button-1>', self.canvas_left_click)
+        self.canvas.bind('<Button-3>', self.canvas_right_click)
 
         self.camiones = []
         self.camion_activo = None
 
-        # Panel de control
-        frame = tk.Frame(root)
-        frame.pack(fill="x")
+        # Panel lateral de control (derecha)
+        controls = tk.Frame(root, width=260, padx=8, pady=8, bg="#f5f5f5")
+        controls.pack(side='right', fill='y')
 
-        self.combo = ttk.Combobox(frame, state="readonly")
-        self.combo.pack(side="left", padx=5)
+        # Toolbar (arriba del panel lateral)
+        toolbar = tk.Frame(controls, bg="#f5f5f5")
+        toolbar.pack(anchor='n', fill='x')
+
+        self.combo = ttk.Combobox(toolbar, state="readonly", width=18)
+        self.combo.pack(side="left", padx=4, pady=4)
         self.combo.bind("<<ComboboxSelected>>", self.seleccionar_camion)
 
-        tk.Button(frame, text="Nuevo Camión", command=self.nuevo_camion).pack(side="left", padx=5)
-        tk.Button(frame, text="Añadir Caja", command=self.nueva_caja).pack(side="left", padx=5)
-        tk.Button(frame, text="Claxon", command=self.audio.claxon).pack(side="left", padx=5)
-        tk.Button(frame, text="Info", command=self.mostrar_info).pack(side="left", padx=5)
+        ttk.Button(toolbar, text="Nuevo", command=self.nuevo_camion).pack(side="left", padx=2)
+        ttk.Button(toolbar, text="Caja", command=self.nueva_caja).pack(side="left", padx=2)
+        ttk.Button(toolbar, text="Claxon", command=self.audio.claxon).pack(side="left", padx=2)
+        ttk.Button(toolbar, text="Info", command=self.mostrar_info).pack(side="left", padx=2)
+
+        # Información detallada del camión activo
+        info_frame = tk.LabelFrame(controls, text="Camión activo", padx=6, pady=6, bg="#f5f5f5")
+        info_frame.pack(fill='x', pady=(8,4))
+
+        self.matricula_var = tk.StringVar(value="-")
+        tk.Label(info_frame, text="Matrícula:", anchor='w', bg="#f5f5f5").grid(row=0, column=0, sticky='w')
+        tk.Label(info_frame, textvariable=self.matricula_var, anchor='w', bg="#f5f5f5").grid(row=0, column=1, sticky='w')
+
+        self.conductor_var = tk.StringVar(value="-")
+        tk.Label(info_frame, text="Conductor:", anchor='w', bg="#f5f5f5").grid(row=1, column=0, sticky='w')
+        tk.Label(info_frame, textvariable=self.conductor_var, anchor='w', bg="#f5f5f5").grid(row=1, column=1, sticky='w')
+
+        self.capacidad_var = tk.StringVar(value="-")
+        tk.Label(info_frame, text="Capacidad (kg):", anchor='w', bg="#f5f5f5").grid(row=2, column=0, sticky='w')
+        tk.Label(info_frame, textvariable=self.capacidad_var, anchor='w', bg="#f5f5f5").grid(row=2, column=1, sticky='w')
+
+        self.peso_var = tk.StringVar(value="0.0")
+        tk.Label(info_frame, text="Peso total (kg):", anchor='w', bg="#f5f5f5").grid(row=3, column=0, sticky='w')
+        tk.Label(info_frame, textvariable=self.peso_var, anchor='w', bg="#f5f5f5").grid(row=3, column=1, sticky='w')
+
+        # Controles para velocidad y rumbo del camión activo
+        ctrl_frame = tk.LabelFrame(controls, text="Controles", padx=6, pady=6, bg="#f5f5f5")
+        ctrl_frame.pack(fill='x', pady=(6,4))
+
+        tk.Label(ctrl_frame, text="Velocidad:", bg="#f5f5f5").grid(row=0, column=0, sticky='w')
+        self.vel_var = tk.DoubleVar(value=0.0)
+        self.vel_spin = tk.Spinbox(ctrl_frame, from_=0, to=180, textvariable=self.vel_var, width=6, command=self.on_speed_change)
+        self.vel_spin.grid(row=0, column=1, sticky='w', padx=4)
+
+        tk.Label(ctrl_frame, text="Rumbo:", bg="#f5f5f5").grid(row=1, column=0, sticky='w')
+        self.rumbo_var = tk.IntVar(value=1)
+        self.rumbo_spin = tk.Spinbox(ctrl_frame, from_=1, to=359, textvariable=self.rumbo_var, width=6, command=self.on_rumbo_change)
+        self.rumbo_spin.grid(row=1, column=1, sticky='w', padx=4)
+
+        # trace vars for manual edits (typing)
+        try:
+            self.vel_var.trace_add('write', lambda *_: self.on_speed_change())
+            self.rumbo_var.trace_add('write', lambda *_: self.on_rumbo_change())
+        except Exception:
+            # older tkinter may use trace
+            self.vel_var.trace('w', lambda *_: self.on_speed_change())
+            self.rumbo_var.trace('w', lambda *_: self.on_rumbo_change())
+
+        # Lista de cajas del camión
+        cajas_frame = tk.LabelFrame(controls, text="Cajas", padx=6, pady=6, bg="#f5f5f5")
+        cajas_frame.pack(fill='both', expand=True, pady=(6,4))
+        self.cajas_list = tk.Listbox(cajas_frame, height=8)
+        self.cajas_list.pack(fill='both', expand=True)
+
+        # barra de estado
+        self.status = tk.Label(root, text="Listo", bd=1, relief='sunken', anchor='w')
+        self.status.pack(side='bottom', fill='x')
 
         self.last_time = time.time()
         self.animar()
@@ -185,6 +247,10 @@ class CamionesApp:
         self.combo["values"] = [cam.matricula for cam in self.camiones]
         self.combo.current(len(self.camiones)-1)
         self.camion_activo = c
+        # actualizar controles e interfaz
+        self.update_controls()
+        self.refresh_cajas_list()
+        self.status.config(text=f"Camión {c.matricula} creado")
 
     def nueva_caja(self):
         if not self.camion_activo:
@@ -198,11 +264,17 @@ class CamionesApp:
         altura = simpledialog.askfloat("Nueva Caja", "Altura:")
         caja = Caja(codigo, peso, desc, largo, ancho, altura)
         self.camion_activo.add_caja(caja)
+        self.refresh_cajas_list()
+        self.peso_var.set(f"{self.camion_activo.peso_total():.1f}")
+        self.status.config(text=f"Añadida caja {codigo} a {self.camion_activo.matricula}")
 
     def seleccionar_camion(self, event=None):
         idx = self.combo.current()
         if idx >= 0:
             self.camion_activo = self.camiones[idx]
+            self.update_controls()
+            self.refresh_cajas_list()
+            self.status.config(text=f"Camión {self.camion_activo.matricula} seleccionado")
 
     def mostrar_info(self):
         if not self.camion_activo:
@@ -215,6 +287,14 @@ class CamionesApp:
                 f"Posición: ({c.x:.1f}, {c.y:.1f})\n"
                 f"Cajas: {len(c.cajas)}\nPeso total: {c.peso_total()} kg")
         messagebox.showinfo("Información", info)
+        self.status.config(text=f"Info mostrada de {c.matricula}")
+
+    def refresh_cajas_list(self):
+        self.cajas_list.delete(0, 'end')
+        if not self.camion_activo:
+            return
+        for ca in self.camion_activo.cajas:
+            self.cajas_list.insert('end', f"{ca.codigo} - {ca.peso_kg}kg")
 
     def animar(self):
         now = time.time()
@@ -222,23 +302,89 @@ class CamionesApp:
         self.last_time = now
 
         self.canvas.delete("all")
-        for c in self.camiones:
+        for idx, c in enumerate(self.camiones):
             c.mover(dt)
-            self.dibujar_camion(c)
+            self.dibujar_camion(idx, c)
 
         self.root.after(int(1000/FPS), self.animar)
 
-    def dibujar_camion(self, c):
+    def dibujar_camion(self, idx, c):
         # Dibujar un rectángulo representando el camión
         w, h = 60, 30
         x1, y1 = c.x - w/2, c.y - h/2
         x2, y2 = c.x + w/2, c.y + h/2
-        # cuerpo
-        self.canvas.create_rectangle(x1, y1, x2, y2, fill="yellow", outline="black")
+        # cuerpo (resaltado si es el activo)
+        tag = f"cam_{idx}"
+        fill = "orange" if (self.camion_activo is c) else "yellow"
+        outline = "red" if (self.camion_activo is c) else "black"
+        width = 3 if (self.camion_activo is c) else 1
+        self.canvas.create_rectangle(x1, y1, x2, y2, fill=fill, outline=outline, width=width, tags=(tag,))
         # matrícula
-        self.canvas.create_text(c.x, c.y - 4, text=c.matricula, font=("Arial", 10, "bold"))
+        self.canvas.create_text(c.x, c.y - 4, text=c.matricula, font=("Arial", 10, "bold"), tags=(tag,))
         # información adicional (nº cajas)
-        self.canvas.create_text(c.x, c.y + h/2 + 6, text=f"{len(c.cajas)} cajas", font=("Arial", 8))
+        self.canvas.create_text(c.x, c.y + h/2 + 6, text=f"{len(c.cajas)} cajas", font=("Arial", 8), tags=(tag,))
+
+    def canvas_left_click(self, event):
+        # seleccionar camión bajo el cursor si existe
+        items = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)
+        for it in items:
+            tags = self.canvas.gettags(it)
+            for t in tags:
+                if t.startswith('cam_'):
+                    try:
+                        idx = int(t.split('_')[1])
+                        if 0 <= idx < len(self.camiones):
+                            self.combo.current(idx)
+                            self.camion_activo = self.camiones[idx]
+                            self.update_controls()
+                            return
+                    except:
+                        pass
+
+    def canvas_right_click(self, event):
+        # tocar claxon del camión bajo el cursor
+        items = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)
+        for it in items:
+            tags = self.canvas.gettags(it)
+            for t in tags:
+                if t.startswith('cam_'):
+                    try:
+                        idx = int(t.split('_')[1])
+                        if 0 <= idx < len(self.camiones):
+                            self.camion_activo = self.camiones[idx]
+                            self.update_controls()
+                            self.audio.claxon()
+                            return
+                    except:
+                        pass
+
+    def update_controls(self):
+        # actualizar widgets con valores del camión activo
+        if not self.camion_activo:
+            return
+        try:
+            self.vel_var.set(self.camion_activo.velocidad)
+            self.rumbo_var.set(self.camion_activo.rumbo)
+        except Exception:
+            pass
+
+    def on_speed_change(self):
+        if not self.camion_activo:
+            return
+        try:
+            v = float(self.vel_var.get())
+            self.camion_activo.setVelocidad(v)
+        except Exception:
+            pass
+
+    def on_rumbo_change(self):
+        if not self.camion_activo:
+            return
+        try:
+            r = int(self.rumbo_var.get())
+            self.camion_activo.setRumbo(r)
+        except Exception:
+            pass
 
     def on_close(self):
         # limpiar audio y salir
