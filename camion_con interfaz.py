@@ -233,4 +233,23 @@ class CamionesApp:
         w, h = 60, 30
         x1, y1 = c.x - w/2, c.y - h/2
         x2, y2 = c.x + w/2, c.y + h/2
-        self.canvas
+        # cuerpo
+        self.canvas.create_rectangle(x1, y1, x2, y2, fill="yellow", outline="black")
+        # matrícula
+        self.canvas.create_text(c.x, c.y - 4, text=c.matricula, font=("Arial", 10, "bold"))
+        # información adicional (nº cajas)
+        self.canvas.create_text(c.x, c.y + h/2 + 6, text=f"{len(c.cajas)} cajas", font=("Arial", 8))
+
+    def on_close(self):
+        # limpiar audio y salir
+        try:
+            self.audio.shutdown()
+        finally:
+            self.root.destroy()
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = CamionesApp(root)
+    root.protocol("WM_DELETE_WINDOW", app.on_close)
+    root.mainloop()
